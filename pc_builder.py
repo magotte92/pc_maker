@@ -1,3 +1,23 @@
+import os
+import time
+import itertools
+import random
+from io import BytesIO
+
+import pandas as pd
+
+from bs4 import BeautifulSoup
+
+from PIL import Image
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+
+
 class CmdColor:
 	header = '\033[95m'
 	warning = '\033[93m'
@@ -19,18 +39,34 @@ class CmdColor:
 	lightgreen='\033[92m'
 
 
+def _local_chromedriver():
+	"""Return a ChromeDriver binary next to this script, if one was supplied."""
+	root = os.path.dirname(os.path.abspath(__file__))
+	for name in ('chromedriver.exe', 'chromedriver'):
+		candidate = os.path.join(root, name)
+		if os.path.isfile(candidate):
+			return candidate
+	return None
+
+
 def init_browser():
-	dirname = os.path.abspath(__file__)
 	chrome_options = Options()
-    # chrome_options.add_argument("--headless")
-	cromium_path = os.path.split(dirname)[0] + '\\chromedriver.exe'
-	driver = webdriver.Chrome(cromium_path, options=chrome_options)
+	# chrome_options.add_argument("--headless")
+	driver_path = _local_chromedriver()
+	# Selenium 4 dropped the executable-path positional argument. A driver
+	# placed next to this script is still honored; otherwise Selenium Manager
+	# resolves a driver that matches the installed Chrome/Chromium.
+	if driver_path:
+		service = Service(executable_path=driver_path)
+		driver = webdriver.Chrome(service=service, options=chrome_options)
+	else:
+		driver = webdriver.Chrome(options=chrome_options)
 	return driver
 
 
 def banner():
 	banner_2 = \
-		'''
+		r'''
 			 _______  _______    _______  _______  _        _______  _______
 			(  ____ )(  ____ \  (       )(  ___  )| \    /\(  ____ \(  ____ )
 			| (    )|| (    \/  | () () || (   ) ||  \  / /| (    \/| (    )|
@@ -41,7 +77,7 @@ def banner():
 			|/       (_______/  |/     \||/     \||_/    \/(_______/|/   \__/
 		'''
 	banner_3 = \
-		'''
+		r'''
 		██████╗  ██████╗    ███╗   ███╗ █████╗ ██╗  ██╗███████╗██████╗
 		██╔══██╗██╔════╝    ████╗ ████║██╔══██╗██║ ██╔╝██╔════╝██╔══██╗
 		██████╔╝██║         ██╔████╔██║███████║█████╔╝ █████╗  ██████╔╝
@@ -50,7 +86,7 @@ def banner():
 		╚═╝      ╚═════╝    ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
 		'''
 	banner_4 = \
-		'''
+		r'''
 
 		 ██▓███   ▄████▄      ███▄ ▄███▓ ▄▄▄       ██ ▄█▀▓█████  ██▀███
 		▓██░  ██▒▒██▀ ▀█     ▓██▒▀█▀ ██▒▒████▄     ██▄█▒ ▓█   ▀ ▓██ ▒ ██▒
@@ -64,13 +100,13 @@ def banner():
 				 ░
 		'''
 	banner_5 = \
-		'''
+		r'''
 		╔═╗╔═╗  ╔╦╗╔═╗╦╔═╔═╗╦═╗
 		╠═╝║    ║║║╠═╣╠╩╗║╣ ╠╦╝
 		╩  ╚═╝  ╩ ╩╩ ╩╩ ╩╚═╝╩╚═
 		'''
 	banner_6 = \
-		'''
+		r'''
 		   ▄███████▄  ▄████████         ▄▄▄▄███▄▄▄▄      ▄████████    ▄█   ▄█▄    ▄████████    ▄████████
 		  ███    ███ ███    ███       ▄██▀▀▀███▀▀▀██▄   ███    ███   ███ ▄███▀   ███    ███   ███    ███
 		  ███    ███ ███    █▀        ███   ███   ███   ███    ███   ███▐██▀     ███    █▀    ███    ███
@@ -82,7 +118,7 @@ def banner():
 																	 ▀                        ███    ███
 		'''
 	banner_7 = \
-		'''
+		r'''
 		 ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄       ▄▄       ▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄    ▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄
 		▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌     ▐░░▌     ▐░░▌▐░░░░░░░░░░░▌▐░▌  ▐░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌
 		▐░█▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀▀▀      ▐░▌░▌   ▐░▐░▌▐░█▀▀▀▀▀▀▀█░▌▐░▌ ▐░▌ ▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀▀▀▀█░▌
@@ -96,7 +132,7 @@ def banner():
 		 ▀            ▀▀▀▀▀▀▀▀▀▀▀       ▀         ▀  ▀         ▀  ▀    ▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀         ▀
 		'''
 	banner_8 = \
-		'''
+		r'''
 		 ▄▄▄· ▄▄·     • ▌ ▄ ·.  ▄▄▄· ▄ •▄ ▄▄▄ .▄▄▄
 		▐█ ▄█▐█ ▌▪    ·██ ▐███▪▐█ ▀█ █▌▄▌▪▀▄.▀·▀▄ █·
 		 ██▀·██ ▄▄    ▐█ ▌▐▌▐█·▄█▀▀█ ▐▀▀▄·▐▀▀▪▄▐▀▀▄
@@ -127,7 +163,6 @@ def menu_picker(func_to_call, ls):
 			raise Exception
 	except Exception as err:
 		os.system('cls')
-
 
 
 def mode_menu(check, color, ls, text):
@@ -173,26 +208,9 @@ def main_menu():
 	mode_menu(style_list[int(style)], color, mode_list, 'Enter your Mode (e.g. 0):')
 
 
+style_list = ['Browsing', 'Gaming', 'Programming', 'Digital Editing', 'Game Developing', 'Architecting', 'Hacking']
+mode_list = ['Simple', 'Advanced']
+
 
 if __name__ == '__main__':
-	import os
-	import time
-	import itertools
-	import random
-	from io import BytesIO
-
-	import pandas as pd
-
-	from bs4 import BeautifulSoup
-
-	from PIL import Image
-
-	from selenium import webdriver
-	from selenium.webdriver.chrome.options import Options
-	from selenium.webdriver.support.ui import WebDriverWait
-	from selenium.webdriver.support import expected_conditions as EC
-	from selenium.common.exceptions import TimeoutException
-
-	style_list = ['Browsing', 'Gaming', 'Programming', 'Digital Editing', 'Game Developing', 'Architecting', 'Hacking']
-	mode_list = ['Simple', 'Advanced']
 	main_menu()
